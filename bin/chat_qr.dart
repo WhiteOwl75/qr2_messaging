@@ -12,27 +12,17 @@ List<Map<String, dynamic>> users = [];
 List<Map<String, dynamic>> messages = [];
 
 void main() async {
-  MySQLConnection sql = await MySQLConnection.createConnection(
-      host: sqlhost,
-      port: 3306,
-      userName: sqlUser,
-      password: sqlPasswors,
-      databaseName: sqlDB);
-  await sql.connect(timeoutMs: 999999999999);
 
   Future<void> rebutMessages() async {
     if (messages.length > 10000) {
       messages.clear();
-      httpServer(sql);
+      httpServer();
     }
   }
 
   var handler = webSocketHandler((webSocket) {
     webSocket.stream.listen((message) async {
-      // При получении сообщения от клиента
       var parsedMessage = jsonDecode(message);
-
-      // Если сообщение содержит информацию о новом пользователе
       if (parsedMessage.containsKey('action') &&
           parsedMessage['action'] == 'join') {
         users.add({
@@ -43,8 +33,14 @@ void main() async {
             messages.where((element) => element['cid'] == users.last['cid']));
         users.last['webSocket'].sink.add(jsonEncode(sortedMessages));
       } else {
-        // Добавляем сообщение в список
         messages.add(parsedMessage);
+        MySQLConnection sql = await MySQLConnection.createConnection(
+            host: sqlhost,
+            port: 3306,
+            userName: sqlUser,
+            password: sqlPasswors,
+            databaseName: sqlDB);
+        await sql.connect(timeoutMs: 999999999999);
         var resul = await sql.execute(
           "SELECT * FROM messages",
         );
@@ -52,6 +48,7 @@ void main() async {
         int idInt = int.parse(id);
         sql.execute(
             "insert into messages (id, chat_id, uid, message) values (${idInt + 1}, ${parsedMessage['cid']}, '${parsedMessage['uid']}','${parsedMessage['text']}')");
+        sql.close();
         // Отправляем сообщение всем подписчикам, кроме отправителя
         for (var user in users) {
           // Фильтруем сообщения для отправки только тем, кто находится в одном чате
@@ -62,6 +59,13 @@ void main() async {
       }
     });
   });
+  MySQLConnection sql = await MySQLConnection.createConnection(
+      host: sqlhost,
+      port: 3306,
+      userName: sqlUser,
+      password: sqlPasswors,
+      databaseName: sqlDB);
+  await sql.connect(timeoutMs: 999999999999);
   final response = await sql.execute("select * from messages");
   for (var item in response.rows) {
     messages.add({
@@ -72,20 +76,14 @@ void main() async {
       'created_at': item.assoc()['created_at'],
     });
   }
+  sql.close();
   shelf_io.serve(handler, '63.251.122.116', portSocket).then((server) {
     print('Serving at ws://${server.address.host}:${server.port}');
   });
-  httpServer(sql);
+  httpServer();
 }
 
-void httpServer(MySQLConnection sql) async {
-  Future<void> checkSQL() async {
-    if (sql.connected == false) {
-      await sql.close();
-      await sql.connect();
-
-    }
-  }
+void httpServer() async {
 
   Router router = Router();
   router.post('/createChat', (Request request) async {
@@ -98,6 +96,13 @@ void httpServer(MySQLConnection sql) async {
       print(data['users'][0]);
       print(data['users'][1]);
       try {
+        MySQLConnection sql = await MySQLConnection.createConnection(
+            host: sqlhost,
+            port: 3306,
+            userName: sqlUser,
+            password: sqlPasswors,
+            databaseName: sqlDB);
+        await sql.connect(timeoutMs: 999999999999);
         final user1 = await sql.execute(
             "SELECT * FROM users_chat WHERE uid = '${data['users'][0]}'");
         final user2 = await sql.execute(
@@ -113,12 +118,19 @@ void httpServer(MySQLConnection sql) async {
           created = true;
           return Response.ok(jsonEncode({'chat_id': chatId}));
         }
-
+        sql.close();
       } catch (e) {
         print(e);
       }
 
       if (!created) {
+        MySQLConnection sql = await MySQLConnection.createConnection(
+            host: sqlhost,
+            port: 3306,
+            userName: sqlUser,
+            password: sqlPasswors,
+            databaseName: sqlDB);
+        await sql.connect(timeoutMs: 999999999999);
         var resul = await sql.execute(
           "SELECT * FROM chats",
         );
@@ -138,30 +150,38 @@ void httpServer(MySQLConnection sql) async {
           await sql.execute(
               "INSERT INTO users_chat (id, chat_id, uid) VALUES (${uidInt + 1}, ${idInt + 1}, '$item')");
         }
+        sql.close();
         return Response.ok(jsonEncode({'chat_id': idInt + 1}));
       }
-    // } else {
-    //   var resul = await sql.execute(
-    //     "SELECT * FROM chats",
-    //   );
-    //   String id = resul.rows.last.assoc()['id'] as String;
-    //   int idInt = int.parse(id);
-    //   await sql.execute(
-    //       "INSERT INTO chats (id, admin_uid, type) VALUES (${idInt + 1}, ${data['admin_uid']}, ${data['type']})");
-    //
-    //   List users = data['users'];
-    //   for (var item in users) {
-    //     var usersCount = await sql.execute(
-    //       "SELECT * FROM users_chat",
-    //     );
-    //     String pid = usersCount.rows.last.assoc()['id'] as String;
-    //     int uidInt = int.parse(pid);
-    //     await sql.execute(
-    //         "INSERT INTO users_chat (id, chat_id, uid) VALUES (${uidInt + 1}, ${idInt + 1}, '$item')");
-    //   }
-    //   return Response.ok(jsonEncode({'chat_id': idInt + 1}));
+      // } else {
+      //   var resul = await sql.execute(
+      //     "SELECT * FROM chats",
+      //   );
+      //   String id = resul.rows.last.assoc()['id'] as String;
+      //   int idInt = int.parse(id);
+      //   await sql.execute(
+      //       "INSERT INTO chats (id, admin_uid, type) VALUES (${idInt + 1}, ${data['admin_uid']}, ${data['type']})");
+      //
+      //   List users = data['users'];
+      //   for (var item in users) {
+      //     var usersCount = await sql.execute(
+      //       "SELECT * FROM users_chat",
+      //     );
+      //     String pid = usersCount.rows.last.assoc()['id'] as String;
+      //     int uidInt = int.parse(pid);
+      //     await sql.execute(
+      //         "INSERT INTO users_chat (id, chat_id, uid) VALUES (${uidInt + 1}, ${idInt + 1}, '$item')");
+      //   }
+      //   return Response.ok(jsonEncode({'chat_id': idInt + 1}));
     }
-    else if (data['type'] == 1 || data['type'] == '1' || data['type'] == 2 || data['type'] == '2') {
+    else if (data['type'] == 1 || data['type'] == '1') {
+      MySQLConnection sql = await MySQLConnection.createConnection(
+          host: sqlhost,
+          port: 3306,
+          userName: sqlUser,
+          password: sqlPasswors,
+          databaseName: sqlDB);
+      await sql.connect(timeoutMs: 999999999999);
       print('type: 1');
       var resul = await sql.execute(
         "SELECT * FROM chats",
@@ -176,12 +196,19 @@ void httpServer(MySQLConnection sql) async {
       await sql.execute(
           "INSERT INTO chats (id, admin_uid, type, name) VALUES (${idInt + 1}, '${data['uid']}', ${data['type']}, '${data['name']}')");
       await sql.execute("INSERT INTO users_chat (id, chat_id, uid) VALUES (${ucidInt + 1}, ${idInt + 1}, '${data['uid']}')");
+      sql.close();
       return Response.ok(jsonEncode({'chat_id': idInt + 1}));
     }
 
   });
   router.post('/addUser', (Request request) async {
-    checkSQL();
+    MySQLConnection sql = await MySQLConnection.createConnection(
+        host: sqlhost,
+        port: 3306,
+        userName: sqlUser,
+        password: sqlPasswors,
+        databaseName: sqlDB);
+    await sql.connect(timeoutMs: 999999999999);
     var json = await request.readAsString();
     var data = await jsonDecode(json);
     var resulUserChats = await sql.execute(
@@ -190,18 +217,25 @@ void httpServer(MySQLConnection sql) async {
     String ucid = resulUserChats.rows.last.assoc()['id'] as String;
     int ucidInt = int.parse(ucid);
     await sql.execute("insert into users_chat (id, chat_id, uid) values (${ucidInt + 1}, ${data['chat_id']}, '${data['uid']}')");
+    sql.close();
     return Response.ok('ok');
   });
   router.post('/sendPush', (Request request) async{
     var json = await request.readAsString();
     var data = await jsonDecode(json);
-    globalPush(data['title'], data['body'],data['topic']);
+    globalPush(data['title'], data['body'], data['']);
     return Response.ok('send');
   });
   router.post('/getChats', (Request request) async {
-    checkSQL();
     var json = await request.readAsString();
     var data = await jsonDecode(json);
+    MySQLConnection sql = await MySQLConnection.createConnection(
+        host: sqlhost,
+        port: 3306,
+        userName: sqlUser,
+        password: sqlPasswors,
+        databaseName: sqlDB);
+    await sql.connect(timeoutMs: 999999999999);
     List chats = [];
     final response = await sql
         .execute("select * from users_chat where uid = '${data['uid']}'");
@@ -239,6 +273,7 @@ void httpServer(MySQLConnection sql) async {
       }
     }
     print(chats);
+    sql.close();
     chats
         .sort((a, b) => (b['message_id'] ?? 0).compareTo(a['message_id'] ?? 0));
     return Response.ok(jsonEncode(chats));
