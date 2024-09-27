@@ -23,13 +23,14 @@ Future<void> globalPush(title, body,topic) async {
 
   // Create the message payload
 
-
+  print(title);
+  print(body);
   final response = await client.post(
     Uri.parse(firebaseMessagingUrl),
     headers: { 'Content-Type': 'application/json' },
     body: jsonEncode({
       "message": {
-        "topic": topic,
+        "topic": topic.toString(),
         "notification": {
           "title": title,
           "body": body,
