@@ -41,13 +41,8 @@ void main() async {
             password: sqlPasswors,
             databaseName: sqlDB);
         await sql.connect(timeoutMs: 999999999999);
-        var resul = await sql.execute(
-          "SELECT * FROM messages",
-        );
-        String id = resul.rows.last.assoc()['id'] as String;
-        int idInt = int.parse(id);
         sql.execute(
-            "insert into messages (id, chat_id, uid, message) values (${idInt + 1}, ${parsedMessage['cid']}, '${parsedMessage['uid']}','${parsedMessage['text']}')");
+            "insert into messages (chat_id, uid, message) values (${parsedMessage['cid']}, '${parsedMessage['uid']}','${parsedMessage['text']}')");
         sql.close();
         // Отправляем сообщение всем подписчикам, кроме отправителя
         for (var user in users) {
@@ -77,7 +72,7 @@ void main() async {
     });
   }
   sql.close();
-  shelf_io.serve(handler, '63.251.122.116', portSocket).then((server) {
+  shelf_io.serve(handler, 'localhost', portSocket).then((server) {
     print('Serving at ws://${server.address.host}:${server.port}');
   });
   httpServer();
@@ -138,7 +133,7 @@ void httpServer() async {
         int idInt = int.parse(id);
 
         await sql.execute(
-            "INSERT INTO chats (id, admin_uid, type) VALUES (${idInt + 1}, ${data['admin_uid']}, ${data['type']})");
+            "INSERT INTO chats (admin_uid, type) VALUES (${data['admin_uid']}, ${data['type']})");
 
         users = data['users'];
         for (var item in users) {
@@ -148,7 +143,7 @@ void httpServer() async {
           String pid = usersCount.rows.last.assoc()['id'] as String;
           int uidInt = int.parse(pid);
           await sql.execute(
-              "INSERT INTO users_chat (id, chat_id, uid) VALUES (${uidInt + 1}, ${idInt + 1}, '$item')");
+              "INSERT INTO users_chat (chat_id, uid) VALUES (${idInt + 1}, '$item')");
         }
         sql.close();
         return Response.ok(jsonEncode({'chat_id': idInt + 1}));
@@ -188,14 +183,9 @@ void httpServer() async {
       );
       String id = resul.rows.last.assoc()['id'] as String;
       int idInt = int.parse(id);
-      var resulUserChats = await sql.execute(
-        "SELECT * FROM users_chat",
-      );
-      String ucid = resulUserChats.rows.last.assoc()['id'] as String;
-      int ucidInt = int.parse(ucid);
       await sql.execute(
-          "INSERT INTO chats (id, admin_uid, type, name) VALUES (${idInt + 1}, '${data['uid']}', ${data['type']}, '${data['name']}')");
-      await sql.execute("INSERT INTO users_chat (id, chat_id, uid) VALUES (${ucidInt + 1}, ${idInt + 1}, '${data['uid']}')");
+          "INSERT INTO chats (admin_uid, type, name) VALUES ('${data['uid']}', ${data['type']}, '${data['name']}')");
+      await sql.execute("INSERT INTO users_chat (chat_id, uid) VALUES ( ${idInt + 1}, '${data['uid']}')");
       sql.close();
       return Response.ok(jsonEncode({'chat_id': idInt + 1}));
     }
@@ -211,19 +201,52 @@ void httpServer() async {
     await sql.connect(timeoutMs: 999999999999);
     var json = await request.readAsString();
     var data = await jsonDecode(json);
-    var resulUserChats = await sql.execute(
-      "SELECT * FROM users_chat",
-    );
-    String ucid = resulUserChats.rows.last.assoc()['id'] as String;
-    int ucidInt = int.parse(ucid);
-    await sql.execute("insert into users_chat (id, chat_id, uid) values (${ucidInt + 1}, ${data['chat_id']}, '${data['uid']}')");
+    await sql.execute("insert into users_chat ( chat_id, uid) values (${data['chat_id']}, '${data['uid']}')");
     sql.close();
     return Response.ok('ok');
   });
   router.post('/sendPush', (Request request) async{
     var json = await request.readAsString();
     var data = await jsonDecode(json);
-    globalPush(data['title'], data['body'], data['']);
+    globalPush(data['title'], data['body'], data['topic']);
+    return Response.ok('send');
+  });
+  router.post('/deleteMessage', (Request request) async {
+    var json = await request.readAsString();
+    var data = await jsonDecode(json);
+    print(data);
+
+    // Удаление сообщения по id
+    messages.removeWhere((message) => message['id'] == data['id']);
+
+    print(messages);
+
+    MySQLConnection sql = await MySQLConnection.createConnection(
+      host: sqlhost,
+      port: 3306,
+      userName: sqlUser,
+      password: sqlPasswors,
+      databaseName: sqlDB,
+    );
+
+    await sql.connect(timeoutMs: 999999999999);
+    await sql.execute("DELETE FROM messages WHERE id = ${data['id']}");
+    await sql.close();
+
+    return Response.ok('send');
+  });
+  router.post('/deleteUser', (Request request) async{
+    var json = await request.readAsString();
+    var data = await jsonDecode(json);
+    MySQLConnection sql = await MySQLConnection.createConnection(
+        host: sqlhost,
+        port: 3306,
+        userName: sqlUser,
+        password: sqlPasswors,
+        databaseName: sqlDB);
+    await sql.connect(timeoutMs: 999999999999);
+    await sql.execute("delete from users_chat where uid='${data['uid']}' and chat_id=${data['chat_id']}");
+    await sql.close();
     return Response.ok('send');
   });
   router.post('/getChats', (Request request) async {
@@ -278,5 +301,5 @@ void httpServer() async {
         .sort((a, b) => (b['message_id'] ?? 0).compareTo(a['message_id'] ?? 0));
     return Response.ok(jsonEncode(chats));
   });
-  serve(router, '63.251.122.116', portHTPP);
+  serve(router, 'localhost', portHTPP);
 }
