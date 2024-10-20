@@ -71,7 +71,7 @@ void main() async {
     });
   }
   sql.close();
-  shelf_io.serve(handler, 'localhost', portSocket).then((server) {
+  shelf_io.serve(handler, baseUrl, portSocket).then((server) {
     print('Serving at ws://${server.address.host}:${server.port}');
   });
   httpServer();
@@ -351,5 +351,5 @@ void httpServer() async {
     return Response.ok(jsonEncode(opponents));
   });
 
-  serve(router, 'localhost', portHTPP);
+  serve(router, baseUrl, portHTPP);
 }
