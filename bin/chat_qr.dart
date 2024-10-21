@@ -175,13 +175,14 @@ void httpServer() async {
           databaseName: sqlDB);
       await sql.connect(timeoutMs: 999999999999);
       print('type: 1');
+
+      await sql.execute(
+          "INSERT INTO chats (admin_uid, type, name) VALUES ('${data['uid']}', ${data['type']}, '${data['name']}')");
       var resul = await sql.execute(
         "SELECT * FROM chats",
       );
       String id = resul.rows.last.assoc()['id'] as String;
       int idInt = int.parse(id);
-      await sql.execute(
-          "INSERT INTO chats (admin_uid, type, name) VALUES ('${data['uid']}', ${data['type']}, '${data['name']}')");
       await sql.execute(
           "INSERT INTO users_chat (chat_id, uid) VALUES ( ${idInt + 1}, '${data['uid']}')");
       sql.close();
@@ -195,13 +196,14 @@ void httpServer() async {
           databaseName: sqlDB);
       await sql.connect(timeoutMs: 999999999999);
       print('type: 2');
+
+      await sql.execute(
+          "INSERT INTO chats (admin_uid, type, name) VALUES ('${data['uid']}', ${data['type']}, '${data['name']}')");
       var resul = await sql.execute(
         "SELECT * FROM chats",
       );
       String id = resul.rows.last.assoc()['id'] as String;
       int idInt = int.parse(id);
-      await sql.execute(
-          "INSERT INTO chats (admin_uid, type, name) VALUES ('${data['uid']}', ${data['type']}, '${data['name']}')");
       await sql.execute(
           "INSERT INTO users_chat (chat_id, uid) VALUES ( ${idInt + 1}, '${data['uid']}')");
       sql.close();
