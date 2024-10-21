@@ -124,16 +124,16 @@ void httpServer() async {
             password: sqlPasswors,
             databaseName: sqlDB);
         await sql.connect(timeoutMs: 999999999999);
+
+
+        await sql.execute(
+            "INSERT INTO chats (admin_uid, type) VALUES (${data['admin_uid']}, ${data['type']})");
+        users = data['users'];
         var resul = await sql.execute(
           "SELECT * FROM chats",
         );
         String id = resul.rows.last.assoc()['id'] as String;
         int idInt = int.parse(id);
-
-        await sql.execute(
-            "INSERT INTO chats (admin_uid, type) VALUES (${data['admin_uid']}, ${data['type']})");
-
-        users = data['users'];
         for (var item in users) {
           var usersCount = await sql.execute(
             "SELECT * FROM users_chat",
